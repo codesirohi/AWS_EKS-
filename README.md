@@ -61,3 +61,78 @@ kubectl apply -f deployment.yaml
 # Using Terraform
 terraform init
 terraform apply
+```
+
+## Traffic Handling in AWS EKS
+
+### Scenario 1: External Traffic to Microservice A
+
+#### Steps:
+1. **External Request**:
+   - An external client sends a request to Microservice A.
+
+2. **Load Balancer**:
+   - The request hits an AWS Elastic Load Balancer (ELB) created by a Kubernetes `LoadBalancer` type service.
+   - The ELB distributes the incoming traffic to the worker nodes that have pods of Microservice A running.
+
+3. **Kube-Proxy**:
+   - The worker node receiving the request has a `kube-proxy` running.
+   - `kube-proxy` uses iptables or IPVS to route the request to one of the pods of Microservice A running on the node.
+
+4. **Pod Selection**:
+   - The specific pod of Microservice A is selected based on a round-robin algorithm or another load balancing strategy configured in `kube-proxy`.
+   - The request is processed by the selected pod of Microservice A.
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: microservice-a
+spec:
+  type: LoadBalancer
+  selector:
+    app: microservice-a
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+```
+
+
+### Scenario 2: Internal Traffic from Microservice A to Microservice B
+
+#### Steps:
+
+1. **Request from Microservice A**:
+   - After processing the initial request, Microservice A needs to communicate with Microservice B to complete the transaction.
+
+2. **Service Discovery**:
+   - Microservice A uses the Kubernetes DNS to discover the service name of Microservice B.
+   - The DNS name for Microservice B might be something like `microservice-b.default.svc.cluster.local`.
+
+3. **ClusterIP Service**:
+   - The request from Microservice A is sent to the ClusterIP of Microservice B.
+   - The ClusterIP is a stable internal IP address that Kubernetes assigns to the service.
+
+4. **Kube-Proxy**:
+   - `kube-proxy` on the worker node hosting the pod of Microservice A routes the request to one of the pods of Microservice B.
+
+5. **Pod Selection**:
+   - The specific pod of Microservice B is selected based on the same load balancing strategy (e.g., round-robin).
+   - The request is processed by the selected pod of Microservice B.
+
+```yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: microservice-b
+spec:
+  type: ClusterIP
+  selector:
+    app: microservice-b
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+```
